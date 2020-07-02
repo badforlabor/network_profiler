@@ -12,6 +12,7 @@ import (
 	"github.com/davyxu/cellnet/proc"
 	"github.com/davyxu/cellnet/timer"
 	"github.com/davyxu/cellnet/util"
+	"github.com/davyxu/golog"
 	"time"
 
 	_ "github.com/davyxu/cellnet/peer/tcp"
@@ -20,6 +21,8 @@ import (
 	_ "github.com/davyxu/cellnet/peer/udp"
 	_ "github.com/davyxu/cellnet/proc/udp"
 )
+
+var netLog = golog.New("net")
 
 type NetServer struct {
 	Protocol string
@@ -136,6 +139,12 @@ func (self *NetClient) OpenClient(addr string) {
 func (self *NetClient) timeEvery1Second() {
 	self.lastAck.Id = AddId(self.lastAck.Id)
 	self.lastAck.Time = TimeNowMs()
+	if len(self.lastAck.Stuffing) != globalConfig.StuffingCount && globalConfig.StuffingCount > 0{
+		self.lastAck.Stuffing = make([]int32, globalConfig.StuffingCount)
+	}
+	if len(self.lastAck.Stuffing) > 0 {
+		self.lastAck.Stuffing[len(self.lastAck.Stuffing)-1] = self.lastAck.Id
+	}
 
 	var msg = self.lastAck
 	if self.session != nil {
@@ -161,4 +170,33 @@ func (self *NetClient) onMsg(ev cellnet.Event) {
 }
 func (self *NetClient) Close() {
 	self.peer.Stop()
+}
+
+func recordAck(host string, old, msg *PtAck) {
+
+	if len(msg.Stuffing) > 0 {
+		if msg.Stuffing[len(msg.Stuffing) - 1] != msg.Id {
+			netLog.Warnln("收到的协议是错误的！", old.Id, host)
+		}
+	}
+
+	if msg.Id == old.Id {
+		if old.Time != msg.Time {
+			netLog.Warnln("收到的协议是错误的！", old.Id, host)
+		} else {
+			var delta = TimeNowMs() - msg.Time
+			if delta > globalConfig.MaxWaitTime {
+				netLog.Warnf("收到协议返回，超时了, id=%d, cost(ms)=%d, host=%s\n", old.Id, delta, host)
+			} else {
+				netLog.Infof("收到协议返回, id=%d, cost(ms)=%d, host=%s\n", old.Id, delta, host)
+			}
+		}
+	} else {
+		var delta = TimeNowMs() - msg.Time
+		if delta > globalConfig.MaxWaitTime {
+			netLog.Warnf("协议错乱，超时了, id=%d, cost(ms)=%d, host=%s\n", msg.Id, delta, host)
+		} else {
+			netLog.Infof("协议错乱，id=%d, cost(ms)=%d, host=%s\n", msg.Id, delta, host)
+		}
+	}
 }

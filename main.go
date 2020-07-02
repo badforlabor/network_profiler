@@ -31,6 +31,9 @@ type GlobalConfig struct {
 
 	// 最多多少个日志
 	LogMaxCount int
+
+	// 每个数据包额外带多少数据
+	StuffingCount int
 }
 
 type ERole int32

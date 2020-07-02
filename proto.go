@@ -18,6 +18,7 @@ import (
 type PtAck struct {
 	Id int32
 	Time int64
+	Stuffing []int32
 }
 
 func init() {
