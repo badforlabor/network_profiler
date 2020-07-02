@@ -10,9 +10,11 @@ import (
 	"flag"
 	"github.com/davyxu/golog"
 	"gopkg.in/ini.v1"
+	"network_profiler/base"
 	"os"
 	"os/signal"
 	"strconv"
+	"time"
 )
 
 type GlobalConfig struct {
@@ -34,6 +36,9 @@ type GlobalConfig struct {
 
 	// 每个数据包额外带多少数据
 	StuffingCount int
+
+	// 是否邮件通知
+	NotEmail int
 }
 
 type ERole int32
@@ -49,6 +54,12 @@ func main() {
 	flag.Parse()
 
 	defer CheckPanic(netLog)
+
+	// 最小化窗口
+	base.ShowConsoleAsync(base.SW_MINIMIZE)
+
+	// 延迟启动几秒
+	time.Sleep(3 * time.Second)
 
 	// 配置文件
 	var iniCfg, err = ini.Load("config.ini")
@@ -91,6 +102,8 @@ func main() {
 	} else {
 		panic("无效的配置文件")
 	}
+
+	go timerReportData()
 
 	// 监听终止
 	c := make(chan os.Signal, 1)
